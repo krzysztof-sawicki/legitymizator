@@ -9,7 +9,7 @@ class XLegitymizator(Legitymizator):
 	PHOTO_WIDTH = 225
 	PHOTO_HEIGHT = 307
 	
-	APPVERSION = '0.1'
+	APPVERSION = '0.2'
 	
 	VALIDCOLOR = wx.Colour(64, 192, 64)
 	INVALIDCOLOR = wx.Colour(255, 127, 0)
@@ -229,6 +229,10 @@ class XLegitymizator(Legitymizator):
 			self.fIdNumber.SetBackgroundColour(self.INVALIDCOLOR)
 		self.notifyUnsavedFormChanges()
 		event.Skip()
+	
+	def onFCardNumberEnter(self, event):
+		self.notifyUnsavedFormChanges()
+		event.Skip()
 		
 	def changeSubBitmapPosition(self, x, y):
 		self.subBitmapPosition[0] += x
@@ -307,9 +311,12 @@ class XLegitymizator(Legitymizator):
 	def reloadDocumentListCtrl(self):
 		self.documentListCtrl.DeleteAllItems()
 		cur = self.db.cursor()
-		data = cur.execute('select ID, Name, PESEL from documents order by ID asc').fetchall()
+		data = cur.execute('select ID, Name, PESEL, CardNumber from documents order by ID asc').fetchall()
 		for i, row in enumerate(data):
-			self.documentListCtrl.Append(row)
+			r = list(row)
+			if r[3] is None:
+				r[3] = ''
+			self.documentListCtrl.Append(r)
 		cur.close()
 	
 	def onSaveRecordButton(self, event):
@@ -349,6 +356,7 @@ class XLegitymizator(Legitymizator):
 		self.fBirthDate.SetDate(wx.DateTime.Now())
 		self.fIssueDate.SetDate(wx.DateTime.Now())
 		self.fIdNumber.SetValue('')
+		self.fCardNumber.SetValue('')
 		self.fIdNumber.Enable(True)
 		self.dataBitmap = wx.Bitmap(self.PHOTO_WIDTH, self.PHOTO_HEIGHT)
 		self.subBitmapSize = [self.PHOTO_WIDTH, self.PHOTO_HEIGHT]
@@ -370,6 +378,10 @@ class XLegitymizator(Legitymizator):
 			self.setDefaultFormValues()
 			self.fIdNumber.Enable(False)
 			self.fIdNumber.SetValue(r[0])
+			if r[13] is not None:
+				self.fCardNumber.SetValue(r[13])
+			else:
+				self.fCardNumber.SetValue('')
 			self.fStudentName.SetValue(r[1])
 			dmy = r[2].split('-')
 			self.fBirthDate.SetDate(wx.DateTime.FromDMY(int(dmy[2]), int(dmy[1])-1, int(dmy[0])))
@@ -439,7 +451,7 @@ class XLegitymizator(Legitymizator):
 		cur.execute('insert into metaInfo (name, value) values ("version", ?)', (self.APPVERSION, ))
 		cur.execute('insert into metaInfo (name, value) values ("principal", ?)', ("dyrektor",))
 		cur.execute('insert into metaInfo (name, value) values ("schoolName", ?)', ("Nazwa szkoły\nAdres szkoły",))
-		cur.execute('CREATE TABLE "documents" ( "ID"	TEXT NOT NULL, "Name"	TEXT NOT NULL, "BirthDate"	TEXT NOT NULL, "PESEL"	TEXT NOT NULL, "SchoolName"	TEXT NOT NULL, "Principal"	TEXT NOT NULL, "IssueDate"	TEXT NOT NULL, "Photo"	BLOB NOT NULL, "PhotoScale"	REAL NOT NULL, "PhotoXOffset"	INTEGER NOT NULL, "PhotoYOffset"	INTEGER NOT NULL, "PhotoXSize"	INTEGER NOT NULL, "PhotoYSize"	INTEGER NOT NULL, PRIMARY KEY("ID"))')
+		cur.execute('CREATE TABLE "documents" ( "ID"	TEXT NOT NULL, "Name"	TEXT NOT NULL, "BirthDate"	TEXT NOT NULL, "PESEL"	TEXT NOT NULL, "SchoolName"	TEXT NOT NULL, "Principal"	TEXT NOT NULL, "IssueDate"	TEXT NOT NULL, "Photo"	BLOB NOT NULL, "PhotoScale"	REAL NOT NULL, "PhotoXOffset"	INTEGER NOT NULL, "PhotoYOffset"	INTEGER NOT NULL, "PhotoXSize"	INTEGER NOT NULL, "PhotoYSize"	INTEGER NOT NULL, "CardNumber" TEXT DEFAULT NULL, PRIMARY KEY("ID"))')
 		cur.close()
 		return True
 	
@@ -449,11 +461,19 @@ class XLegitymizator(Legitymizator):
 			return False
 		cur = self.db.cursor()
 		d = cur.execute("select value from metaInfo where name = 'version'").fetchone()
-		if d[0] == self.APPVERSION:
+		dbVer = d[0]
+		if dbVer == self.APPVERSION:
 			pass
 		else:
-			dial = wx.MessageDialog(self, "Niezgodność wersji bazy danych", "Błąd", wx.OK|wx.STAY_ON_TOP|wx.CENTRE)
+			#ALTER TABLE documents ADD COLUMN 	"CardNumber"	TEXT DEFAULT NULL
+			dial = wx.MessageDialog(self, "Niezgodność wersji bazy danych. Rozpoczynam aktualizację!", "Uwaga!", wx.OK|wx.STAY_ON_TOP|wx.CENTRE)
 			dial.ShowModal()
+			while dbVer != self.APPVERSION:
+				if dbVer == '0.1':
+					dbVer = '0.2'
+					cur.execute('ALTER TABLE documents ADD COLUMN 	"CardNumber"	TEXT DEFAULT NULL')
+					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
+			
 		cur.close()
 		return True
 	
@@ -472,7 +492,7 @@ class XLegitymizator(Legitymizator):
 		os.remove(photoName)
 		cur = self.db.cursor()
 		if ID == 0:
-			t = cur.execute('insert into documents (ID, Name, BirthDate, PESEL, SchoolName, Principal, IssueDate, Photo, PhotoScale, PhotoXOffset, PhotoYOffset, PhotoXSize, PhotoYSize) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+			t = cur.execute('insert into documents (ID, Name, BirthDate, PESEL, SchoolName, Principal, IssueDate, CardNumber, Photo, PhotoScale, PhotoXOffset, PhotoYOffset, PhotoXSize, PhotoYSize) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 			(
 				self.fIdNumber.GetValue(),
 				self.fStudentName.GetValue(),
@@ -481,6 +501,7 @@ class XLegitymizator(Legitymizator):
 				self.fSchool.GetValue(),
 				self.fPrincipal.GetValue(),
 				self.fIssueDate.GetDate().FormatISODate(),
+				self.fCardNumber.GetValue(),
 				photoData,
 				self.dataBitmap.GetScaleFactor(),
 				self.subBitmapPosition[0],
@@ -489,7 +510,7 @@ class XLegitymizator(Legitymizator):
 				self.subBitmapSize[1]
 			))
 		else:
-			t = cur.execute('update documents set Name = ?, BirthDate = ?, PESEL = ?, SchoolName = ?, Principal = ?, IssueDate = ?, Photo = ?, PhotoScale = ?, PhotoXOffset = ?, PhotoYOffset = ?, PhotoXSize = ?, PhotoYSize = ? where ID = ?',
+			t = cur.execute('update documents set Name = ?, BirthDate = ?, PESEL = ?, SchoolName = ?, Principal = ?, IssueDate = ?, CardNumber = ?, Photo = ?, PhotoScale = ?, PhotoXOffset = ?, PhotoYOffset = ?, PhotoXSize = ?, PhotoYSize = ? where ID = ?',
 			(
 				self.fStudentName.GetValue(),
 				self.fBirthDate.GetDate().FormatISODate(),
@@ -497,6 +518,7 @@ class XLegitymizator(Legitymizator):
 				self.fSchool.GetValue(),
 				self.fPrincipal.GetValue(),
 				self.fIssueDate.GetDate().FormatISODate(),
+				self.fCardNumber.GetValue(),
 				photoData,
 				self.dataBitmap.GetScaleFactor(),
 				self.subBitmapPosition[0],
