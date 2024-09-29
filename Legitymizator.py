@@ -399,6 +399,8 @@ class XLegitymizator(Legitymizator):
 			if fileDialog.ShowModal() == wx.ID_CANCEL:
 				return False
 			pathname = fileDialog.GetPath()
+			if not pathname.endswith('.db'):
+				pathname += ".db"
 			if self.createNewDb(pathname):
 				self.dbNameStaticText.SetLabel(pathname)
 				return True
