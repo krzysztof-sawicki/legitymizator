@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from legitymizatorlib import *
 from StudentID import StudentID
+from lconfig import lConfig
 import gc, wx, uuid, tempfile, sqlite3, os, re, shutil
 
 class XLegitymizator(Legitymizator):
@@ -395,7 +396,9 @@ class XLegitymizator(Legitymizator):
 		event.Skip()
 	
 	def newDbDialog(self):
+		lastPath = os.path.dirname(lConfig.getField('lastDB'))
 		with wx.FileDialog(self, "Zapisz nową bazę danych", wildcard="SQLite (*.db)|*.db", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+			fileDialog.SetDirectory(lastPath)
 			if fileDialog.ShowModal() == wx.ID_CANCEL:
 				return False
 			pathname = fileDialog.GetPath()
@@ -403,6 +406,7 @@ class XLegitymizator(Legitymizator):
 				pathname += ".db"
 			if self.createNewDb(pathname):
 				self.dbNameStaticText.SetLabel(pathname)
+				lConfig.updateField('lastDB', pathname)
 				return True
 			return False
 	
@@ -411,7 +415,9 @@ class XLegitymizator(Legitymizator):
 		event.Skip()
 		
 	def openDbDialog(self):
+		lastPath = os.path.dirname(lConfig.getField('lastDB'))
 		with wx.FileDialog(self, "Otwórz bazę danych", wildcard="SQLite (*.db)|*.db", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
+			fileDialog.SetDirectory(lastPath)
 			if fileDialog.ShowModal() == wx.ID_CANCEL:
 				return False
 			pathname = fileDialog.GetPath()
@@ -419,6 +425,7 @@ class XLegitymizator(Legitymizator):
 				self.dbFileName = pathname
 				self.dbNameStaticText.SetLabel(pathname)
 				self.reloadDocumentListCtrl()
+				lConfig.updateField('lastDB', pathname)
 				return True
 			return False
 	
