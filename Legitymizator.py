@@ -465,7 +465,6 @@ class XLegitymizator(Legitymizator):
 		if dbVer == self.APPVERSION:
 			pass
 		else:
-			#ALTER TABLE documents ADD COLUMN 	"CardNumber"	TEXT DEFAULT NULL
 			dial = wx.MessageDialog(self, "Niezgodność wersji bazy danych. Rozpoczynam aktualizację!", "Uwaga!", wx.OK|wx.STAY_ON_TOP|wx.CENTRE)
 			dial.ShowModal()
 			while dbVer != self.APPVERSION:
@@ -492,7 +491,7 @@ class XLegitymizator(Legitymizator):
 		os.remove(photoName)
 		cur = self.db.cursor()
 		if ID == 0:
-			t = cur.execute('insert into documents (ID, Name, BirthDate, PESEL, SchoolName, Principal, IssueDate, CardNumber, Photo, PhotoScale, PhotoXOffset, PhotoYOffset, PhotoXSize, PhotoYSize) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+			t = cur.execute('insert into documents (ID, Name, BirthDate, PESEL, SchoolName, Principal, IssueDate, CardNumber, Photo, PhotoScale, PhotoXOffset, PhotoYOffset, PhotoXSize, PhotoYSize) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 			(
 				self.fIdNumber.GetValue(),
 				self.fStudentName.GetValue(),
