@@ -251,11 +251,15 @@ class XLegitymizator(Legitymizator):
 	
 	def openPhotoFileSelector(self, event):
 		with wx.FileDialog(self, "Otwórz zdjęcie", wildcard="Zdjęcia (*.jpg)|*.jpg", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
-
+			lastPhotoPath = lConfig.getField('lastPhoto')
+			if lastPhotoPath is not None:
+				lastPath = os.path.dirname(lastPhotoPath)
+				fileDialog.SetPath(lastPath)
 			if fileDialog.ShowModal() == wx.ID_CANCEL:
 				return
 			self.loadBitmap(fileDialog.GetPath())
 			self.editPhotoSwitch.Enable()
+			lConfig.updateField('lastPhoto', fileDialog.GetPath())
 		event.Skip()
 		
 	
