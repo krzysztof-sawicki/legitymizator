@@ -34,6 +34,8 @@ class XLegitymizator(Legitymizator):
 		self.photo.Bind(wx.EVT_MOTION, self.photoMotion)
 		self.mainPanel.Bind(wx.EVT_MOUSEWHEEL, self.photoMouseWheel)
 		
+		self.statusbar.SetStatusText("Legitymizator v"+str(self.APPVERSION), 0)
+		
 		while True:
 			dial = wx.MessageDialog(self, "Otworzyć istniejącą bazę czy stworzyć nową?", "Baza danych", wx.YES_NO|wx.CANCEL|wx.STAY_ON_TOP|wx.CENTRE)
 			dial.SetYesNoCancelLabels("Istniejąca baza", "Nowa baza", "Zamknij program")
