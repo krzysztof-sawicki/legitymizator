@@ -9,7 +9,7 @@ class XLegitymizator(Legitymizator):
 	PHOTO_WIDTH = 225
 	PHOTO_HEIGHT = 307
 	
-	APPVERSION = '0.2'
+	APPVERSION = '0.3'
 	
 	VALIDCOLOR = wx.Colour(64, 192, 64)
 	INVALIDCOLOR = wx.Colour(255, 127, 0)
@@ -497,6 +497,9 @@ class XLegitymizator(Legitymizator):
 				if dbVer == '0.1':
 					dbVer = '0.2'
 					cur.execute('ALTER TABLE documents ADD COLUMN 	"CardNumber"	TEXT DEFAULT NULL')
+					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
+				if dbVer == '0.2':
+					dbVer = '0.3'
 					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
 			
 		cur.close()
