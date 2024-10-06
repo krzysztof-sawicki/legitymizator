@@ -403,6 +403,26 @@ class XLegitymizator(Legitymizator):
 			self.notifyUnsavedFormChanges(False)
 		event.Skip()
 	
+	def onDocumentListCtrlRightClick(self, event):
+		selectedID = self.documentListCtrl.GetItem(event.GetIndex(), 0).GetText()
+		r = self.getRecord(selectedID)
+		menu = wx.Menu()
+		menu.Append(wx.ID_ANY, f"Usuń rekord {r[0]}")
+		self.Bind(wx.EVT_MENU, self.onDeleteRecordClick, id=menu.GetMenuItems()[0].GetId())
+		self.PopupMenu(menu)
+		menu.Destroy()
+		event.Skip()
+	
+	def onDeleteRecordClick(self, event):
+		selectedID = self.documentListCtrl.GetItem(self.documentListCtrl.GetFirstSelected(), 0).GetText()
+		r = self.getRecord(selectedID)
+		dialogDel = wx.MessageBox(f"Czy na pewno chcesz usunąć rekord {r[0]}? Dane rekordu zostaną bezpowrotnie usunięte", f"Potwierdź usunięcie rekordu {r[0]}",  wx.YES_NO | wx.ICON_QUESTION)
+		if dialogDel == wx.YES:
+			self.deleteRecord(r[0])
+			self.reloadDocumentListCtrl()
+			wx.MessageBox(f"Rekord {r[0]} usunięty")
+		event.Skip()
+	
 	def onDbSettings(self, event):
 		dbSettingsFrame = XDBSettings(self, wx.ID_ANY, "")
 		dbSettingsFrame.Show()
@@ -485,6 +505,12 @@ class XLegitymizator(Legitymizator):
 	def getRecord(self, ID):
 		cur = self.db.cursor()
 		d = cur.execute('select * from documents where ID = ?', (ID,)).fetchone()
+		cur.close()
+		return d
+	
+	def deleteRecord(self, ID):
+		cur = self.db.cursor()
+		d = cur.execute('delete from documents where ID = ?', (ID,))
 		cur.close()
 		return d
 	
