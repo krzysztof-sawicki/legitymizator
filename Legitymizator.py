@@ -250,7 +250,7 @@ class XLegitymizator(Legitymizator):
 			self.subBitmapPosition[1] = self.dataBitmap.GetScaledHeight() - self.subBitmapSize[1]
 	
 	def openPhotoFileSelector(self, event):
-		with wx.FileDialog(self, "Otwórz zdjęcie", wildcard="Zdjęcia (*.jpg)|*.jpg", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
+		with wx.FileDialog(self, "Otwórz zdjęcie", wildcard="Zdjęcia (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
 			lastPhotoPath = lConfig.getField('lastPhoto')
 			if lastPhotoPath is not None:
 				lastPath = os.path.dirname(lastPhotoPath)
