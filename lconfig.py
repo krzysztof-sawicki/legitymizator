@@ -3,7 +3,7 @@ import os
 
 class lConfig:
 	configFile = os.path.join(os.path.expanduser("~"), ".legitymizator")
-	defaultConfig = {"lastDB": "", "lastPhoto": ""}
+	defaultConfig = {"lastDB": "", "lastPhoto": "", "scanner": ""}
 
 	@staticmethod
 	def initializeConfig():

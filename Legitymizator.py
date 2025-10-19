@@ -2,7 +2,7 @@
 from legitymizatorlib import *
 from StudentID import StudentID
 from lconfig import lConfig
-import gc, wx, uuid, tempfile, sqlite3, os, re, shutil, io
+import gc, wx, uuid, tempfile, sqlite3, os, re, shutil, io, sane
 from PIL import Image
 
 class XLegitymizator(Legitymizator):
@@ -463,6 +463,55 @@ class XLegitymizator(Legitymizator):
 		cur.close()
 		event.Skip()
 	
+	def scanAndLoadPhoto(self, event):
+		scanneruri = lConfig.getField("scanner")
+		if scanneruri is None or len(scanneruri) == 0:
+			wx.MessageBox("Brak wybranego skanera!", "Błąd", wx.OK | wx.ICON_ERROR)
+		sane.init()
+		try:
+			scanner = sane.open(scanneruri)
+		except Exception as e:
+			wx.MessageBox(f"Nie można otworzyć skanera: {scanneruri}\nBłąd: {str(e)}", "Błąd otwarcia skanera", wx.OK | wx.ICON_ERROR)
+			return None
+		
+		photo_width = 35
+		photo_height = 45
+		margin_factor = 0.15
+
+		scan_width = photo_width * (1 + 2 * margin_factor)
+		scan_height = photo_height * (1 + 2 * margin_factor)
+
+		scanner_width = 210.0
+
+		left = scanner_width - scan_width
+		top = 0.0
+		
+		scanner.tl_x = left
+		scanner.tl_y = top
+		scanner.br_x = left + scan_width
+		scanner.br_y = top + scan_height
+		scanner.resolution = 300
+		
+		scanner.start()
+		image = scanner.snap()
+		sane.exit()
+		
+		buffer = io.BytesIO()
+		image.save(buffer, format="PNG")
+		image_bytes = buffer.getvalue() 
+		buffer.close()
+		image_bytearray = bytearray(image_bytes)
+		
+		self.loadBitmap(image_bytearray)
+		self.editPhotoSwitch.Enable()
+		
+		event.Skip()
+	
+	def onScannerSelection(self, event):
+		scannerSelectionFrame = XScannerSelection(self, wx.ID_ANY, "")
+		scannerSelectionFrame.Show()
+		event.Skip()
+	
 	## Baza danych
 	def onNewDb(self, event):
 		self.newDbDialog()
@@ -627,6 +676,45 @@ class XDBSettings(DBSettings):
 		cur.execute("update metaInfo set value = ? where name = ?", (self.principalCtrl.GetValue(), 'principal'))
 		cur.close()
 		self.Destroy()
+		event.Skip()
+
+class XScannerSelection(ScannerSelection):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.radio_buttons = []
+		self.devices = []
+	
+	def onFindScanners(self, event):
+		selectedScanner = lConfig.getField('scanner')
+		print(f"Selected scanner: {selectedScanner}")
+		sane.init()
+		self.devices = sane.get_devices()
+		for device in self.devices:
+			print(device)
+		self.radio_buttons = []
+		for i, (name, vendor, model, type_) in enumerate(self.devices):
+			rb = wx.RadioButton(self.panel_1, label=f"{name}", style=wx.RB_GROUP if i == 0 else 0)
+			if name == selectedScanner:
+				rb.SetValue(True)
+			self.radio_buttons.append(rb)
+		insert_pos = 1
+		for i, rb in enumerate(self.radio_buttons):
+			self.sizer_1.Insert(insert_pos + i, rb, flag=wx.ALL, border=5)
+		self.sizer_1.Layout()
+		self.findScannersButton.Disable()
+		event.Skip()
+	
+	def onOKButton(self, event): 
+		if len(self.radio_buttons):
+			for i, rb in enumerate(self.radio_buttons):
+				if rb.GetValue():
+					if len(self.devices) > i:
+						lConfig.updateField("scanner", self.devices[i][0])
+		self.Close()
+		event.Skip()
+	
+	def onCancelButton(self, event):
+		self.Close()
 		event.Skip()
 
 class XLegitymizatorApp(wx.App):
