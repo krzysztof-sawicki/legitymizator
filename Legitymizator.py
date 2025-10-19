@@ -2,14 +2,15 @@
 from legitymizatorlib import *
 from StudentID import StudentID
 from lconfig import lConfig
-import gc, wx, uuid, tempfile, sqlite3, os, re, shutil
+import gc, wx, uuid, tempfile, sqlite3, os, re, shutil, io
+from PIL import Image
 
 class XLegitymizator(Legitymizator):
 	
 	PHOTO_WIDTH = 225
 	PHOTO_HEIGHT = 307
 	
-	APPVERSION = '0.3'
+	APPVERSION = '0.4'
 	
 	VALIDCOLOR = wx.Colour(64, 192, 64)
 	INVALIDCOLOR = wx.Colour(255, 127, 0)
@@ -428,6 +429,40 @@ class XLegitymizator(Legitymizator):
 		dbSettingsFrame.Show()
 		event.Skip()
 	
+	def onPhotoExport(self, event):  # wxGlade: Legitymizator.<event_handler>
+		exportDir = os.path.dirname(lConfig.getField('lastDB'))
+		with wx.DirDialog(self, "Wskaż katalog do eksportu", "", style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
+			if dirDialog.ShowModal() == wx.ID_CANCEL:
+				return False
+			pathname = dirDialog.GetPath()
+		cur = self.db.cursor()
+		data = cur.execute('select ID, Name, Photo, PhotoScale, PhotoXOffset, PhotoYOffset, PhotoXSize, PhotoYSize from documents order by ID asc').fetchall()
+		for i, row in enumerate(data):
+			r = list(row)
+			fname = f"{pathname}/{r[0].replace('/', '_')}_{r[1]}.jpg"
+			print(fname)
+			image = Image.open(io.BytesIO(r[2]))
+			ratio = r[3]
+			left = int(r[4] * ratio)
+			upper = int(r[5] * ratio)
+			right = int((r[4]+r[6]) * ratio)
+			lower = int((r[5]+r[7]) * ratio)
+			cropped_image = image.crop((left, upper, right, lower))
+			
+			orig_width, orig_height = cropped_image.size
+			scale_w = self.PHOTO_WIDTH / orig_width
+			scale_h = self.PHOTO_HEIGHT / orig_height
+			
+			scale = max(scale_w, scale_h)
+			
+			new_width = int(orig_width * scale)
+			new_height = int(orig_height * scale)
+
+			resized_image = cropped_image.resize((new_width, new_height), Image.LANCZOS)
+			resized_image.save(fname, format='JPEG')
+		cur.close()
+		event.Skip()
+	
 	## Baza danych
 	def onNewDb(self, event):
 		self.newDbDialog()
@@ -500,6 +535,9 @@ class XLegitymizator(Legitymizator):
 					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
 				if dbVer == '0.2':
 					dbVer = '0.3'
+					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
+				if dbVer == '0.3':
+					dbVer = '0.4'
 					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
 			
 		cur.close()
