@@ -6,42 +6,42 @@ import gc, wx, uuid, tempfile, sqlite3, os, re, shutil, io, sane
 from PIL import Image
 
 class XLegitymizator(Legitymizator):
-	
+
 	PHOTO_WIDTH = 225
 	PHOTO_HEIGHT = 307
-	
+
 	APPVERSION = '0.4'
-	
+
 	VALIDCOLOR = wx.Colour(64, 192, 64)
 	INVALIDCOLOR = wx.Colour(255, 127, 0)
-	
+
 	bitmapIsLoaded = False
 	unsavedChanges = False
 	startMousePosition = None
 	db = None
 	dbFileName = None
-	
+
 	subBitmapPosition = [0,0]
-	
+
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.tempdir = tempfile.mkdtemp('_legitymizator')
 		self.dataBitmap = wx.Bitmap(self.PHOTO_WIDTH, self.PHOTO_HEIGHT)
 		#rozmiar bitmapy powinen być minimum: 225 x 307 (19x26 mm @ 300 dpi)
 		self.subBitmapSize = [self.PHOTO_WIDTH, self.PHOTO_HEIGHT]
-		
+
 		self.photo.Bind(wx.EVT_LEFT_DOWN, self.photoMouseDown)
 		self.photo.Bind(wx.EVT_LEFT_UP, self.photoMouseUp)
 		self.photo.Bind(wx.EVT_MOTION, self.photoMotion)
 		self.mainPanel.Bind(wx.EVT_MOUSEWHEEL, self.photoMouseWheel)
-		
+
 		self.statusbar.SetStatusText("Legitymizator v"+str(self.APPVERSION), 0)
-		
+
 		while True:
 			dial = wx.MessageDialog(self, "Otworzyć istniejącą bazę czy stworzyć nową?", "Baza danych", wx.YES_NO|wx.CANCEL|wx.STAY_ON_TOP|wx.CENTRE)
 			dial.SetYesNoCancelLabels("Istniejąca baza", "Nowa baza", "Zamknij program")
 			r = dial.ShowModal()
-			
+
 			if r == wx.ID_YES: #istniejąca
 				ret = self.openDbDialog()
 				if ret:
@@ -55,7 +55,7 @@ class XLegitymizator(Legitymizator):
 			elif r == wx.ID_CANCEL: #zamknij program
 				wx.Exit()
 		self.setDefaultFormValues()
-	
+
 	def onFrameClose(self, event):
 		if os.path.exists(self.tempdir):
 			shutil.rmtree(self.tempdir)
@@ -97,7 +97,7 @@ class XLegitymizator(Legitymizator):
 		os = self.photo.GetSize()
 		self.photo.SetBitmap(self.dataBitmap.GetSubBitmap(wx.Rect(int(self.subBitmapPosition[0]),int(self.subBitmapPosition[1]), int(self.subBitmapSize[0]), int(self.subBitmapSize[1]))))
 		self.photo.SetSize(wx.Size(self.PHOTO_WIDTH, self.PHOTO_HEIGHT))
-		
+
 	def photoMouseDown(self, event):
 		self.startMousePosition = wx.GetMousePosition()
 		event.Skip()
@@ -116,7 +116,7 @@ class XLegitymizator(Legitymizator):
 			self.startMousePosition = actpos
 			self.notifyUnsavedFormChanges()
 		event.Skip()
-	
+
 	def photoZoom(self, value):
 		asf = self.dataBitmap.GetScaleFactor()
 		oasf = asf
@@ -128,13 +128,13 @@ class XLegitymizator(Legitymizator):
 			self.reloadBitmap()
 		except:
 			self.dataBitmap.SetScaleFactor(oasf)
-	
-	def photoMouseWheel(self, event): 
+
+	def photoMouseWheel(self, event):
 		if self.editPhotoSwitch.GetValue():
 			phs = self.photo.GetSize()
 			php = self.photo.GetPosition()
 			cursor = event.GetPosition()
-			
+
 			if cursor[0] >= php[0] and cursor[0] <= php[0]+phs[0] and cursor[1] >= php[1] and cursor[1] <= php[1]+phs[1]:
 				if event.GetWheelRotation() < 0:
 					self.photoZoom(0.05)
@@ -142,23 +142,23 @@ class XLegitymizator(Legitymizator):
 					self.photoZoom(-0.05)
 				self.notifyUnsavedFormChanges()
 		event.Skip()
-	
+
 	def validatePESEL(self, pesel):
 		if not isinstance(pesel, str) or len(pesel) != 11 or not pesel.isdigit():
 			return False
 		digits = [int(digit) for digit in pesel]
-		
+
 		control_sum = (1 * digits[0] + 3 * digits[1] + 7 * digits[2] + 9 * digits[3] + 1 * digits[4] + 3 * digits[5] + 7 * digits[6] + 9 * digits[7] + 1 * digits[8] + 3 * digits[9]) % 10
 		check_digit = 10 - control_sum
 		check_digit = 0 if check_digit == 10 else check_digit
 		return check_digit == digits[10]
-	
+
 	def validateDocumentForm(self):
 		if len(self.fStudentName.GetValue()) > 0 and self.validatePESEL(self.fPESEL.GetValue()) and len(self.fSchool.GetValue()) > 0 and len(self.fPrincipal.GetValue()) > 0 and (self.validateIdNumber(self.fIdNumber.GetValue()) or (len(self.fIdNumber.GetValue()) > 0 and self.fIdNumber.IsEnabled() == False)) and self.bitmapIsLoaded:
 			return True
 		else:
 			return False
-	
+
 	def validateIdNumber(self, number):
 		if len(number) < 1:
 			return False
@@ -172,7 +172,7 @@ class XLegitymizator(Legitymizator):
 				return True
 		else:
 			return False
-	
+
 	def PESELtoDateTime(self, pesel):
 		if not self.validatePESEL(pesel):
 			return wx.DateTime()
@@ -188,14 +188,14 @@ class XLegitymizator(Legitymizator):
 		elif century_indicator == 3:
 			year += 300
 		return wx.DateTime(day, month-1, year)
-	
+
 	def notifyUnsavedFormChanges(self, on = True):
 		self.RecordChangeIndicator.Show(on)
 		self.unsavedChanges = on
-	
+
 	def areUnsavedFormChanges(self):
 		return self.unsavedChanges
-	
+
 	def onfPESELEnter(self, event):
 		self.notifyUnsavedFormChanges()
 		if self.validatePESEL(self.fPESEL.GetValue()):
@@ -204,7 +204,7 @@ class XLegitymizator(Legitymizator):
 		else:
 			self.fPESEL.SetBackgroundColour(self.INVALIDCOLOR)
 		event.Skip()
-		
+
 	def onFStudentNameEnter(self, event):
 		self.notifyUnsavedFormChanges()
 		event.Skip()
@@ -232,15 +232,15 @@ class XLegitymizator(Legitymizator):
 			self.fIdNumber.SetBackgroundColour(self.INVALIDCOLOR)
 		self.notifyUnsavedFormChanges()
 		event.Skip()
-	
+
 	def onFCardNumberEnter(self, event):
 		self.notifyUnsavedFormChanges()
 		event.Skip()
-		
+
 	def changeSubBitmapPosition(self, x, y):
 		self.subBitmapPosition[0] += x
 		self.subBitmapPosition[1] += y
-		
+
 		if self.subBitmapPosition[0] < 0:
 			self.subBitmapPosition[0] = 0
 		if self.subBitmapPosition[1] < 0:
@@ -249,7 +249,7 @@ class XLegitymizator(Legitymizator):
 			self.subBitmapPosition[0] = self.dataBitmap.GetScaledWidth() - self.subBitmapSize[0]
 		if self.subBitmapPosition[1] >= self.dataBitmap.GetScaledHeight() - self.subBitmapSize[1]:
 			self.subBitmapPosition[1] = self.dataBitmap.GetScaledHeight() - self.subBitmapSize[1]
-	
+
 	def openPhotoFileSelector(self, event):
 		with wx.FileDialog(self, "Otwórz zdjęcie", wildcard="Zdjęcia (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
 			lastPhotoPath = lConfig.getField('lastPhoto')
@@ -262,8 +262,8 @@ class XLegitymizator(Legitymizator):
 			self.editPhotoSwitch.Enable()
 			lConfig.updateField('lastPhoto', fileDialog.GetPath())
 		event.Skip()
-		
-	
+
+
 	def onGenerateFileButton(self, event):
 		fStudentName = self.fStudentName.GetValue()
 		fBirthDate = self.fBirthDate.GetDate().Format("%d.%m.%Y")
@@ -273,7 +273,7 @@ class XLegitymizator(Legitymizator):
 		fIssueDate = self.fIssueDate.GetDate().Format("%d.%m.%Y")
 		fIdNumber = self.fIdNumber.GetValue()
 		fname = os.path.dirname(self.dbFileName) + '/' + re.sub(r'\W+', '_', fIdNumber) + '.pdf'
-		
+
 		if self.validateDocumentForm():
 			photoName = self.tempdir + "/" + uuid.uuid4().hex + '.jpg'
 			self.dataBitmap.GetSubBitmap(wx.Rect(int(self.subBitmapPosition[0]),int(self.subBitmapPosition[1]), int(self.subBitmapSize[0]), int(self.subBitmapSize[1]))).SaveFile(photoName, wx.BITMAP_TYPE_JPEG)
@@ -290,7 +290,7 @@ class XLegitymizator(Legitymizator):
 				return None
 		event.Skip()
 		return None
-	
+
 	def onViewGenerateButton(self, event):
 		fStudentName = self.fStudentName.GetValue()
 		fBirthDate = self.fBirthDate.GetDate().Format("%d.%m.%Y")
@@ -307,14 +307,14 @@ class XLegitymizator(Legitymizator):
 				b = wx.Bitmap.FromPNGData(d)
 				self.IDView.SetBitmap(b)
 		event.Skip()
-		
+
 	def onPrintButton(self, event):
 		f = self.onGenerateFileButton(event)
 		if f is not None and os.path.exists(f):
 			self.pdfViewer.LoadFile(f)
 			self.pdfViewer.Print()
 		event.Skip()
-	
+
 	def reloadDocumentListCtrl(self):
 		self.documentListCtrl.DeleteAllItems()
 		cur = self.db.cursor()
@@ -325,7 +325,7 @@ class XLegitymizator(Legitymizator):
 				r[3] = ''
 			self.documentListCtrl.Append(r)
 		cur.close()
-	
+
 	def onSaveRecordButton(self, event):
 		if not self.db:
 			dial = wx.MessageDialog(self, "Brak wskazanej bazy danych", "Błąd", wx.OK|wx.STAY_ON_TOP|wx.CENTRE)
@@ -343,12 +343,12 @@ class XLegitymizator(Legitymizator):
 				self.reloadDocumentListCtrl()
 				self.notifyUnsavedFormChanges(False)
 		event.Skip()
-	
+
 	def onNewRecordButton(self, event):
 		self.setDefaultFormValues()
 		self.editPhotoSwitch.Disable()
 		event.Skip()
-	
+
 	def setDefaultFormValues(self):
 		cur = self.db.cursor()
 		d = cur.execute('select * from metaInfo').fetchall()
@@ -371,7 +371,7 @@ class XLegitymizator(Legitymizator):
 		self.reloadBitmap()
 		self.IDView.SetBitmap(wx.Bitmap())
 		self.notifyUnsavedFormChanges(False)
-	
+
 	def onDocumentListCtrlSelect(self, event):
 		if self.areUnsavedFormChanges():
 			dial = wx.MessageDialog(self, "Bieżący rekord nie został zapisany. Czy chcesz zignorować wprowadzone zmiany?", "Niezapisane zmiany", wx.YES_NO|wx.NO_DEFAULT|wx.STAY_ON_TOP|wx.CENTRE)
@@ -397,13 +397,13 @@ class XLegitymizator(Legitymizator):
 			self.fPrincipal.SetValue(r[5])
 			dmy = r[6].split('-')
 			self.fIssueDate.SetDate(wx.DateTime.FromDMY(int(dmy[2]), int(dmy[1])-1, int(dmy[0])))
-			
+
 			self.loadBitmap(r[7], r[8], r[9], r[10], r[11], r[12])
 			self.bitmapIsLoaded = True
 			self.editPhotoSwitch.Enable()
 			self.notifyUnsavedFormChanges(False)
 		event.Skip()
-	
+
 	def onDocumentListCtrlRightClick(self, event):
 		selectedID = self.documentListCtrl.GetItem(event.GetIndex(), 0).GetText()
 		r = self.getRecord(selectedID)
@@ -413,7 +413,7 @@ class XLegitymizator(Legitymizator):
 		self.PopupMenu(menu)
 		menu.Destroy()
 		event.Skip()
-	
+
 	def onDeleteRecordClick(self, event):
 		selectedID = self.documentListCtrl.GetItem(self.documentListCtrl.GetFirstSelected(), 0).GetText()
 		r = self.getRecord(selectedID)
@@ -423,12 +423,12 @@ class XLegitymizator(Legitymizator):
 			self.reloadDocumentListCtrl()
 			wx.MessageBox(f"Rekord {r[0]} usunięty")
 		event.Skip()
-	
+
 	def onDbSettings(self, event):
 		dbSettingsFrame = XDBSettings(self, wx.ID_ANY, "")
 		dbSettingsFrame.Show()
 		event.Skip()
-	
+
 	def onPhotoExport(self, event):  # wxGlade: Legitymizator.<event_handler>
 		exportDir = os.path.dirname(lConfig.getField('lastDB'))
 		with wx.DirDialog(self, "Wskaż katalog do eksportu", "", style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
@@ -448,13 +448,13 @@ class XLegitymizator(Legitymizator):
 			right = int((r[4]+r[6]) * ratio)
 			lower = int((r[5]+r[7]) * ratio)
 			cropped_image = image.crop((left, upper, right, lower))
-			
+
 			orig_width, orig_height = cropped_image.size
 			scale_w = self.PHOTO_WIDTH / orig_width
 			scale_h = self.PHOTO_HEIGHT / orig_height
-			
+
 			scale = max(scale_w, scale_h)
-			
+
 			new_width = int(orig_width * scale)
 			new_height = int(orig_height * scale)
 
@@ -462,7 +462,7 @@ class XLegitymizator(Legitymizator):
 			resized_image.save(fname, format='JPEG')
 		cur.close()
 		event.Skip()
-	
+
 	def scanAndLoadPhoto(self, event):
 		scanneruri = lConfig.getField("scanner")
 		if scanneruri is None or len(scanneruri) == 0:
@@ -473,7 +473,7 @@ class XLegitymizator(Legitymizator):
 		except Exception as e:
 			wx.MessageBox(f"Nie można otworzyć skanera: {scanneruri}\nBłąd: {str(e)}", "Błąd otwarcia skanera", wx.OK | wx.ICON_ERROR)
 			return None
-		
+
 		photo_width = 35
 		photo_height = 45
 		margin_factor = 0.15
@@ -485,38 +485,39 @@ class XLegitymizator(Legitymizator):
 
 		left = scanner_width - scan_width
 		top = 0.0
-		
+
 		scanner.tl_x = left
 		scanner.tl_y = top
 		scanner.br_x = left + scan_width
 		scanner.br_y = top + scan_height
 		scanner.resolution = 300
-		
+
 		scanner.start()
 		image = scanner.snap()
+		scanner.close()
 		sane.exit()
-		
+
 		buffer = io.BytesIO()
 		image.save(buffer, format="PNG")
-		image_bytes = buffer.getvalue() 
+		image_bytes = buffer.getvalue()
 		buffer.close()
 		image_bytearray = bytearray(image_bytes)
-		
+
 		self.loadBitmap(image_bytearray)
 		self.editPhotoSwitch.Enable()
-		
+
 		event.Skip()
-	
+
 	def onScannerSelection(self, event):
 		scannerSelectionFrame = XScannerSelection(self, wx.ID_ANY, "")
 		scannerSelectionFrame.Show()
 		event.Skip()
-	
+
 	## Baza danych
 	def onNewDb(self, event):
 		self.newDbDialog()
 		event.Skip()
-	
+
 	def newDbDialog(self):
 		lastPath = os.path.dirname(lConfig.getField('lastDB'))
 		with wx.FileDialog(self, "Zapisz nową bazę danych", wildcard="SQLite (*.db)|*.db", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
@@ -531,11 +532,11 @@ class XLegitymizator(Legitymizator):
 				lConfig.updateField('lastDB', pathname)
 				return True
 			return False
-	
+
 	def onOpenDb(self, event):
 		self.openDbDialog()
 		event.Skip()
-		
+
 	def openDbDialog(self):
 		lastPath = os.path.dirname(lConfig.getField('lastDB'))
 		with wx.FileDialog(self, "Otwórz bazę danych", wildcard="SQLite (*.db)|*.db", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
@@ -550,7 +551,7 @@ class XLegitymizator(Legitymizator):
 				lConfig.updateField('lastDB', pathname)
 				return True
 			return False
-	
+
 	def createNewDb(self, name):
 		self.db = sqlite3.connect(name, isolation_level = None)
 		if not self.db:
@@ -564,7 +565,7 @@ class XLegitymizator(Legitymizator):
 		cur.execute('CREATE TABLE "documents" ( "ID"	TEXT NOT NULL, "Name"	TEXT NOT NULL, "BirthDate"	TEXT NOT NULL, "PESEL"	TEXT NOT NULL, "SchoolName"	TEXT NOT NULL, "Principal"	TEXT NOT NULL, "IssueDate"	TEXT NOT NULL, "Photo"	BLOB NOT NULL, "PhotoScale"	REAL NOT NULL, "PhotoXOffset"	INTEGER NOT NULL, "PhotoYOffset"	INTEGER NOT NULL, "PhotoXSize"	INTEGER NOT NULL, "PhotoYSize"	INTEGER NOT NULL, "CardNumber" TEXT DEFAULT NULL, PRIMARY KEY("ID"))')
 		cur.close()
 		return True
-	
+
 	def openDb(self, name):
 		self.db = sqlite3.connect(name, isolation_level = None)
 		if not self.db:
@@ -588,22 +589,22 @@ class XLegitymizator(Legitymizator):
 				if dbVer == '0.3':
 					dbVer = '0.4'
 					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
-			
+
 		cur.close()
 		return True
-	
+
 	def getRecord(self, ID):
 		cur = self.db.cursor()
 		d = cur.execute('select * from documents where ID = ?', (ID,)).fetchone()
 		cur.close()
 		return d
-	
+
 	def deleteRecord(self, ID):
 		cur = self.db.cursor()
 		d = cur.execute('delete from documents where ID = ?', (ID,))
 		cur.close()
 		return d
-	
+
 	def saveCurrentRecord(self, ID = 0):
 		photoName = self.tempdir + "/" + uuid.uuid4().hex + '.png'
 		self.dataBitmap.SaveFile(photoName, wx.BITMAP_TYPE_PNG)
@@ -669,7 +670,7 @@ class XDBSettings(DBSettings):
 		else:
 			dial = wx.MessageDialog(self, "Brak wskazanej bazy danych", "Błąd", wx.OK|wx.STAY_ON_TOP|wx.CENTRE)
 			dial.ShowModal()
-	
+
 	def onSettingsSaveButton(self, event):
 		cur = self.db.cursor()
 		cur.execute("update metaInfo set value = ? where name = ?", (self.schoolNameCtrl.GetValue(), 'schoolName'))
@@ -683,7 +684,7 @@ class XScannerSelection(ScannerSelection):
 		super().__init__(*args, **kwargs)
 		self.radio_buttons = []
 		self.devices = []
-	
+
 	def onFindScanners(self, event):
 		selectedScanner = lConfig.getField('scanner')
 		print(f"Selected scanner: {selectedScanner}")
@@ -703,8 +704,8 @@ class XScannerSelection(ScannerSelection):
 		self.sizer_1.Layout()
 		self.findScannersButton.Disable()
 		event.Skip()
-	
-	def onOKButton(self, event): 
+
+	def onOKButton(self, event):
 		if len(self.radio_buttons):
 			for i, rb in enumerate(self.radio_buttons):
 				if rb.GetValue():
@@ -712,7 +713,7 @@ class XScannerSelection(ScannerSelection):
 						lConfig.updateField("scanner", self.devices[i][0])
 		self.Close()
 		event.Skip()
-	
+
 	def onCancelButton(self, event):
 		self.Close()
 		event.Skip()
