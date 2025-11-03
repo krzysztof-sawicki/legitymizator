@@ -10,7 +10,7 @@ class XLegitymizator(Legitymizator):
 	PHOTO_WIDTH = 225
 	PHOTO_HEIGHT = 307
 
-	APPVERSION = '0.4'
+	APPVERSION = '0.5'
 
 	VALIDCOLOR = wx.Colour(64, 192, 64)
 	INVALIDCOLOR = wx.Colour(255, 127, 0)
@@ -429,7 +429,78 @@ class XLegitymizator(Legitymizator):
 		dbSettingsFrame.Show()
 		event.Skip()
 
-	def onPhotoExport(self, event):  # wxGlade: Legitymizator.<event_handler>
+	def cropPhoto(self, photo, ratio, left, upper, right, lower):
+		image = Image.open(io.BytesIO(photo))
+		cropped_image = image.crop((left, upper, right, lower))
+
+		orig_width, orig_height = cropped_image.size
+		scale_w = self.PHOTO_WIDTH / orig_width
+		scale_h = self.PHOTO_HEIGHT / orig_height
+
+		scale = max(scale_w, scale_h)
+
+		new_width = int(orig_width * scale)
+		new_height = int(orig_height * scale)
+
+		if new_width < self.PHOTO_WIDTH:
+			new_width = self.PHOTO_WIDTH
+		if new_height < self.PHOTO_HEIGHT:
+			new_height = self.PHOTO_HEIGHT
+
+		resized_image = cropped_image.resize((new_width, new_height), Image.LANCZOS)
+
+		return resized_image
+
+	def onDbOptimize(self, event):
+		response = wx.MessageDialog(
+			self,
+			"Czy na pewno chcesz przeprowadzić optymalizację bazy danych? Jest to działanie, które może potencjalnie uszkodzić dane. Czy masz kopię zapasową bazy?",
+			"Potwierdzenie",
+			style=wx.YES_NO | wx.ICON_QUESTION
+		).ShowModal()
+
+		if response == wx.ID_YES:
+			cur = self.db.cursor()
+			d = cur.execute('select ID, Photo, PhotoScale, PhotoXOffset, PhotoYOffset, PhotoXSize, PhotoYSize from documents').fetchall()
+			diff = 0
+			for i, row in enumerate(d):
+				r = list(row)
+
+				ratio = r[2]
+				if(ratio > 1.0):
+
+					left = int(r[3] * ratio)
+					upper = int(r[4] * ratio)
+					right = int((r[3]+r[5]) * ratio)
+					lower = int((r[4]+r[6]) * ratio)
+					resized_image = self.cropPhoto(r[1], ratio, left, upper, right, lower)
+					byte_stream = io.BytesIO()
+					resized_image.save(byte_stream, format='PNG')
+					png_data = byte_stream.getvalue()
+
+					t = cur.execute('update documents set Photo = ?, PhotoScale = ?, PhotoXOffset = ?, PhotoYOffset = ?, PhotoXSize = ?, PhotoYSize = ? where ID = ?',
+					(png_data, 1.0, 0, 0, self.PHOTO_WIDTH, self.PHOTO_HEIGHT, r[0]))
+
+					diff += len(r[1]) - len(png_data)
+
+			cur.execute('VACUUM')
+			if(diff) > 1024*1024:
+				dmsg = f"Odzyskano około {(diff//(1024*1024))} MB danych"
+			else:
+				dmsg = "Zakończono operację optymalizacji bazy danych. Zysk < 1MB"
+			wx.MessageDialog(
+				self,
+				dmsg,
+				"Informacja",
+				style=wx.OK | wx.ICON_INFORMATION
+			).ShowModal()
+			cur.close()
+		else:
+			pass
+
+		event.Skip()
+
+	def onPhotoExport(self, event):
 		exportDir = os.path.dirname(lConfig.getField('lastDB'))
 		with wx.DirDialog(self, "Wskaż katalog do eksportu", "", style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
 			if dirDialog.ShowModal() == wx.ID_CANCEL:
@@ -447,18 +518,7 @@ class XLegitymizator(Legitymizator):
 			upper = int(r[5] * ratio)
 			right = int((r[4]+r[6]) * ratio)
 			lower = int((r[5]+r[7]) * ratio)
-			cropped_image = image.crop((left, upper, right, lower))
-
-			orig_width, orig_height = cropped_image.size
-			scale_w = self.PHOTO_WIDTH / orig_width
-			scale_h = self.PHOTO_HEIGHT / orig_height
-
-			scale = max(scale_w, scale_h)
-
-			new_width = int(orig_width * scale)
-			new_height = int(orig_height * scale)
-
-			resized_image = cropped_image.resize((new_width, new_height), Image.LANCZOS)
+			resized_image = self.cropPhoto(r[2], ratio, left, upper, right, lower)
 			resized_image.save(fname, format='JPEG')
 		cur.close()
 		event.Skip()
