@@ -649,6 +649,9 @@ class XLegitymizator(Legitymizator):
 				if dbVer == '0.3':
 					dbVer = '0.4'
 					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
+				if dbVer == '0.4':
+					dbVer = '0.5'
+					cur.execute('update metaInfo set value = ? where name = "version"', (dbVer,))
 
 		cur.close()
 		return True
